@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Every key the app needs is a build setting (INFOPLIST_KEY_* in the
+	     project), which Xcode merges into the Info.plist it generates. This
+	     file stays for the keys Xcode has no build setting for, and there are
+	     none yet.
+
+	     It lives outside Kohuke/ because that folder is a synchronised group:
+	     a plist inside it would also be copied into the bundle as a resource. -->
+</dict>
+</plist>
