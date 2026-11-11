@@ -1,0 +1,62 @@
+{
+  "appTabMe": {
+    "en": "Me",
+    "az": "Hesab",
+    "ru": "Я"
+  },
+  "appReadIn": {
+    "en": "I read in",
+    "az": "Oxuduğum dil",
+    "ru": "Я читаю на"
+  },
+  "appOnTheWeb": {
+    "en": "The flashcards on the web",
+    "az": "Kartlar saytda",
+    "ru": "Карточки на сайте"
+  },
+  "appKeepWhy": {
+    "en": "An account remembers which cards you know, on every phone and on tallinntastebuds.ee, and lets you write decks of your own.",
+    "az": "Hesab hansı kartları bildiyini hər telefonda və tallinntastebuds.ee saytında yadda saxlayır, öz dəstlərini yaratmağa da imkan verir.",
+    "ru": "Аккаунт помнит, какие карточки вы знаете, на любом телефоне и на tallinntastebuds.ee, и позволяет составлять свои колоды."
+  },
+  "appTalkHow": {
+    "en": "Read it in Estonian, a sentence at a time, with what each means under it. Tap any word for what it means, and the speaker to hear the sentence.",
+    "az": "Estoncasını cümlə-cümlə oxu, hər birinin mənası altındadır. Sözün mənası üçün sözə, cümləni eşitmək üçün səsucaldana toxun.",
+    "ru": "Читайте по-эстонски, по одному предложению, с переводом под каждым. Нажмите на слово, чтобы узнать его значение, и на динамик, чтобы услышать предложение."
+  },
+  "appOffline": {
+    "en": "Couldn’t reach tallinntastebuds.ee.",
+    "az": "tallinntastebuds.ee saytına qoşulmaq olmadı.",
+    "ru": "Не удалось связаться с tallinntastebuds.ee."
+  },
+  "appOfflineNote": {
+    "en": "Offline. This is what the phone saw last.",
+    "az": "Şəbəkə yoxdur. Bu, telefonun sonuncu dəfə gördüyüdür.",
+    "ru": "Нет сети. Это то, что телефон видел в последний раз."
+  },
+  "appApple": {
+    "en": "Continue with Apple",
+    "az": "Apple ilə davam et",
+    "ru": "Продолжить с Apple"
+  },
+  "appErrApple": {
+    "en": "Apple sign-in did not finish. Try again.",
+    "az": "Apple ilə giriş tamamlanmadı. Yenidən cəhd et.",
+    "ru": "Вход через Apple не завершился. Попробуйте ещё раз."
+  },
+  "appNoReset": {
+    "en": "There’s no reset — let your iPhone save the password.",
+    "az": "Bərpa yoxdur — qoy iPhone parolu yadda saxlasın.",
+    "ru": "Сброса пароля нет — пусть iPhone сохранит его."
+  },
+  "appGoogleOnSite": {
+    "en": "Made your account with Google? Set a password for it on tallinntastebuds.ee, under your account, and sign in here with that.",
+    "az": "Hesabını Google ilə yaratmısan? tallinntastebuds.ee saytında, hesabında ona parol təyin et və burada onunla daxil ol.",
+    "ru": "Создали аккаунт через Google? Задайте для него пароль на tallinntastebuds.ee, в своём аккаунте, и войдите здесь с ним."
+  },
+  "appDeleteNoPassword": {
+    "en": "An account made with Google or Apple and no password: type your username instead.",
+    "az": "Hesab Google və ya Apple ilə yaradılıb və parolu yoxdursa, əvəzinə istifadəçi adını yaz.",
+    "ru": "Если аккаунт создан через Google или Apple и пароля у него нет, введите вместо него имя пользователя."
+  }
+}

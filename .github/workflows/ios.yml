@@ -1,0 +1,159 @@
+name: build
+
+# Builds the app for the simulator on every push, so a change that does not
+# compile is caught here rather than the next time someone opens Xcode.
+
+# The screenshots below are pushed to the ci-screens branch, which needs
+# write access to the repository's contents.
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for iOS Simulator
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app's own strings come in the three languages the cards are
+      # turned over into. A key missing one of them is a sentence that falls
+      # back to English in the middle of an Azerbaijani screen.
+      - name: Check the app's own strings
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          strings = json.load(open('Kohuke/Seed/app-strings.json'))
+          bad = [k for k, v in strings.items() if sorted(v) != ['az', 'en', 'ru'] or not all(v.values())]
+          if bad:
+              sys.exit('app-strings.json: not in all three languages: ' + ', '.join(bad))
+          print(len(strings), 'strings, each in en, az and ru')
+          PY
+
+      - name: Show the selected Xcode
+        run: xcodebuild -version
+
+      - name: Build
+        shell: bash
+        run: |
+          set -o pipefail
+          build=(xcodebuild build
+            -project Kohuke.xcodeproj
+            -scheme Kohuke
+            -destination 'generic/platform=iOS Simulator'
+            -configuration Debug
+            -derivedDataPath build
+            CODE_SIGNING_ALLOWED=NO)
+          # xcbeautify ships with the runner image, but the build must not fail
+          # merely because a future image drops it.
+          if command -v xcbeautify >/dev/null 2>&1; then
+            "${build[@]}" | xcbeautify --renderer github-actions
+          else
+            "${build[@]}"
+          fi
+
+      - name: Check the generated Info.plist
+        shell: bash
+        run: |
+          set -euo pipefail
+          plist=build/Build/Products/Debug-iphonesimulator/Kohuke.app/Info.plist
+          echo "--- Info.plist ---"
+          plutil -p "$plist"
+
+          fail=0
+          check() {
+            if plutil -p "$plist" | grep -q "$2"; then
+              echo "ok: $1"
+            else
+              echo "::error::$1 is missing from the built Info.plist"
+              fail=1
+            fi
+          }
+          check "display name"      '"CFBundleDisplayName" => "Kohuke"'
+          check "bundle id"         '"CFBundleIdentifier" => "ee.tallinntastebuds.kohuke"'
+          check "encryption answer" '"ITSAppUsesNonExemptEncryption"'
+          exit $fail
+
+      # Nobody can look at a simulator from a cloud session, so the app is
+      # launched here on the screens worth seeing and each one photographed.
+      # LaunchScript.swift reads the arguments. The pictures are the run's
+      # "screens" artifact; nothing about them can fail the build except the
+      # simulator itself not starting. They are of the live site's decks,
+      # signed out, since a script has no account.
+      - name: Photograph the screens
+        shell: bash
+        run: |
+          set -euo pipefail
+          app=build/Build/Products/Debug-iphonesimulator/Kohuke.app
+          bundle=ee.tallinntastebuds.kohuke
+          dev=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [x for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          plain = [x for x in phones if x["name"] in ("iPhone 16", "iPhone 15")]
+          print((plain or phones)[0]["udid"])')
+          xcrun simctl boot "$dev"
+          xcrun simctl bootstatus "$dev" -b
+          xcrun simctl status_bar "$dev" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          xcrun simctl install "$dev" "$app"
+          mkdir -p screens
+          shot() {
+            local name="$1"; shift
+            xcrun simctl terminate "$dev" "$bundle" >/dev/null 2>&1 || true
+            xcrun simctl launch "$dev" "$bundle" "$@" >/dev/null
+            sleep 12
+            xcrun simctl io "$dev" screenshot "screens/$name.png" >/dev/null
+            echo "photographed $name"
+          }
+          shot 01-words
+          shot 02-card-front -kOpen deck:greetings
+          shot 03-card-back -kOpen deck:greetings -kTurned YES
+          shot 04-card-forms -kOpen deck:food -kTurned YES
+          shot 05-grammar -kTab 1
+          shot 06-lesson -kTab 1 -kOpen lesson:noun-forms
+          shot 07-songs -kTab 2
+          shot 08-song -kTab 2 -kOpen song:naera-naera
+          shot 09-talks -kTab 3
+          shot 10-talk -kTab 3 -kOpen talk:talk-monday -kWord esmaspäev
+          shot 11-me -kTab 4
+          shot 12-sign-in -kTab 4 -kSheet signin
+          shot 13-sign-in-doors -kTab 4 -kSheet signin -kDoors YES
+          # The other two languages, and the three styles that are not the
+          # one every picture above is drawn in.
+          shot 14-words-az -lang az
+          shot 15-card-back-ru -kOpen deck:greetings -kTurned YES -lang ru
+          shot 16-lesson-az -kTab 1 -kOpen lesson:noun-forms -lang az
+          shot 17-words-red -style red
+          shot 18-card-green -kOpen deck:greetings -style green
+          shot 19-talk-plum -kTab 3 -kOpen talk:talk-monday -style plum
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: screens
+          if-no-files-found: ignore
+
+      # The same pictures, shrunk, on a branch of their own, because a git
+      # fetch reaches a cloud session where an artifact download does not.
+      # One orphan commit, force-pushed over the last, so the branch never
+      # grows; it carries the screens of whichever branch pushed last.
+      - name: Publish the screens to the ci-screens branch
+        if: github.event_name == 'push' && startsWith(github.ref_name, 'claude/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=$(mktemp -d)
+          for f in screens/*.png; do
+            sips -Z 900 -s format jpeg -s formatOptions 70 "$f" --out "$out/$(basename "${f%.png}").jpg" >/dev/null
+          done
+          echo "${GITHUB_REF_NAME} @ ${GITHUB_SHA}" > "$out/FROM.txt"
+          cd "$out"
+          git init -q -b ci-screens
+          git add .
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -q -m "Screens of ${GITHUB_REF_NAME}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-screens

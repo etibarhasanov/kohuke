@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- The app icon, drawn: a kohuke — the chocolate-glazed curd bar every
+     Estonian shop sells — with a bite out of it, on the Baltic blue of the
+     style the app opens in. Kohuke/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+     is this page photographed at 1024 × 1024; README.md says how.
+
+     Two copies of the bar, one over the other: the curd underneath with the
+     bite cut out of it, and the glaze on top with a slightly bigger bite cut
+     out, so the curd shows as a rim where the teeth went through. -->
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#1B4A8C}svg{display:block}</style>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="glaze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#70432D"/>
+      <stop offset="1" stop-color="#3E2216"/>
+    </linearGradient>
+    <mask id="bite">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="850" cy="398" r="78"/>
+      <circle cx="822" cy="512" r="78"/>
+      <circle cx="850" cy="626" r="78"/>
+      <rect x="850" y="300" width="174" height="424"/>
+    </mask>
+    <mask id="bigger">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="850" cy="398" r="112"/>
+      <circle cx="822" cy="512" r="112"/>
+      <circle cx="850" cy="626" r="112"/>
+      <rect x="850" y="300" width="174" height="424"/>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" fill="#1B4A8C"/>
+  <ellipse cx="490" cy="722" rx="340" ry="30" fill="#0E2C59"/>
+  <rect x="130" y="352" width="764" height="320" rx="100" fill="#FFF3DC" mask="url(#bite)"/>
+  <g mask="url(#bigger)">
+    <rect x="130" y="352" width="764" height="320" rx="100" fill="url(#glaze)"/>
+    <rect x="200" y="386" width="420" height="30" rx="15" fill="#fff" opacity=".16"/>
+  </g>
+</svg>
