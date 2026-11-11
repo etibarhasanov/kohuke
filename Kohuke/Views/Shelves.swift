@@ -11,10 +11,18 @@ import SwiftUI
 /// hundred words known and Going deeper at four hundred, and a stage that
 /// has not opened is its heading and one line saying how far off it is: the
 /// decks behind it are not in the answer at all. Above the headings stand
-/// Start, which goes back to the deck in hand, and the two gathered decks —
-/// what was missed and what is known — where there is anything in them.
-/// Below them, the decks somebody wrote themselves.
+/// Start, which goes back to whatever was left half done, and the two
+/// gathered decks — what was missed and what is known — where there is
+/// anything in them. Below them, the decks somebody wrote themselves.
+///
+/// A phone that has never answered a card is not shown any of this first.
+/// It is shown Tere, the first card of Hello and goodbye, which is the
+/// website's front door: a stranger handed a shelf of forty decks is being
+/// asked to choose before they have seen what the thing does.
 struct WordsTab: View {
+    /// The deck a stranger is opened on: `FIRST_DECK` on the website.
+    static let firstDeck = "greetings"
+
     fileprivate static let levels = [
         ("start", "flashLevelStart", "First words"),
         ("eat", "flashLevelEat", "At a restaurant"),
@@ -35,22 +43,25 @@ struct WordsTab: View {
         @State private var newName = ""
         @State private var problem: String?
         @State private var signingIn = false
+        @State private var greeted = false
 
         var body: some View {
+            let tracked = store.signedIn && store.ready
             let shipped = store.decks.filter { $0.own != true && !$0.gathered }
             let gathered = store.decks.filter(\.gathered)
             let own = store.decks.filter { $0.own == true }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(store.t("flashTitle", "Estonian, one card at a time"))
+                Text(store.been && !store.hello.isEmpty ? store.hello : store.t("flashTitle", "Estonian, one card at a time"))
                     .foregroundStyle(Theme.muted)
                 Text(store.t("flashLearned", "You know {n} Estonian words.", ["n": "\(store.words)"]))
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.ink)
-                if store.daysRunning > 0 {
-                    Text(store.t("flashDaysRun", "{n} days in a row.", ["n": "\(store.daysRunning)"]))
-                        .foregroundStyle(Theme.muted)
-                }
+            }
+            .onAppear {
+                guard !greeted else { return }
+                greeted = true
+                if !store.been && LaunchScript.routes(tab: 0).isEmpty { push(.deck(WordsTab.firstDeck)) }
             }
 
             if !store.ready {
@@ -60,11 +71,11 @@ struct WordsTab: View {
             }
 
             if let next = next(shipped) {
-                NavigationLink(value: Route.deck(next.id)) {
+                NavigationLink(value: next.route) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(store.t("flashPartStart", "Start")).font(.headline)
-                            Text("\(store.means(next.name)) · \(next.known) / \(next.cards)")
+                            Text(next.detail)
                                 .font(.footnote)
                                 .opacity(0.85)
                         }
@@ -106,7 +117,7 @@ struct WordsTab: View {
                         }
                     }
                     if !these.isEmpty {
-                        Rows { ForEach(these) { DeckShelfRow(deck: $0) } }
+                        Rows { ForEach(DeckShelfRow.ordered(these, tracked: tracked)) { DeckShelfRow(deck: $0) } }
                     }
                 }
             }
@@ -117,7 +128,7 @@ struct WordsTab: View {
                     Text(store.t("flashYoursNone", "No decks of your own yet. Name one and start putting words in it."))
                         .foregroundStyle(Theme.muted)
                 } else {
-                    Rows { ForEach(own) { DeckShelfRow(deck: $0) } }
+                    Rows { ForEach(DeckShelfRow.ordered(own, tracked: tracked)) { DeckShelfRow(deck: $0) } }
                 }
                 HStack(spacing: 10) {
                     TextField(store.t("flashNewDeck", "A new deck"), text: $newName,
@@ -151,12 +162,43 @@ struct WordsTab: View {
             }
         }
 
-        /// The deck Start goes to: the one last opened while it still has
-        /// cards to learn, and otherwise the first on the shelf that has.
-        private func next(_ shipped: [DeckRow]) -> DeckRow? {
-            let unfinished = shipped.filter { $0.known < $0.cards }
-            let last = UserDefaults.standard.string(forKey: "last")
-            return unfinished.first { $0.id == last } ?? unfinished.first ?? shipped.first
+        /// Where Start goes, and the line under it. Whatever this phone had
+        /// open last — a deck, a lesson, a song, a conversation — while there
+        /// is still something to do in it; and otherwise the first deck on
+        /// the shelf with cards waiting or still to learn. Something gone
+        /// from the shelf, or behind a stage that has not opened, is passed
+        /// over rather than opened on a notice.
+        private func next(_ shipped: [DeckRow]) -> (route: Route, detail: String)? {
+            func deckLine(_ d: DeckRow) -> String {
+                let due = d.due ?? 0
+                return store.means(d.name) + " · " + (store.signedIn && due > 0
+                    ? store.t("flashDue", "{n} due", ["n": "\(due)"])
+                    : "\(d.known) / \(d.cards)")
+            }
+            func waiting(_ d: DeckRow) -> Bool { d.known < d.cards || (store.signedIn && (d.due ?? 0) > 0) }
+
+            switch store.last {
+            case .deck(let id)?:
+                if let d = store.decks.first(where: { $0.id == id }), !d.gathered, waiting(d) {
+                    return (.deck(id), deckLine(d))
+                }
+            case .lesson(let id)?:
+                if let l = store.lessons.first(where: { $0.id == id }), !store.done(Store.grammarDeck, id, l.read) {
+                    return (.lesson(id), store.means(l.name) + " · " + store.t("flashGrammar", "Grammar"))
+                }
+            case .song(let id)?:
+                if let s = store.songs.first(where: { $0.id == id }), !store.done(Store.songDeck, id, s.heard) {
+                    return (.song(id), store.means(s.name) + " · " + store.t("flashSongs", "Songs"))
+                }
+            case .talk(let id)?:
+                if let c = store.talks.first(where: { $0.id == id }), !store.done(Store.talkDeck, id, c.read) {
+                    return (.talk(id), store.means(c.name) + " · " + store.t("flashTalks", "Conversations"))
+                }
+            case nil:
+                break
+            }
+            guard let d = shipped.first(where: waiting) ?? shipped.first else { return nil }
+            return (.deck(d.id), deckLine(d))
         }
 
         private func make() async {
@@ -204,8 +246,9 @@ struct GrammarTab: View {
                 ShelfRow(route: .lesson(lesson.id),
                          title: store.means(lesson.name),
                          subtitle: store.means(lesson.why),
-                         figure: read ? store.t("flashRead", "Read") : "",
-                         done: read)
+                         figure: read ? store.t("flashRead", "Read") : store.t("flashUnread", "Not read yet"),
+                         done: read,
+                         fresh: !read && Store.fresh(lesson.added))
                 if let deck = store.decks.first(where: { $0.id == lesson.deck }) {
                     DeckShelfRow(deck: deck, follows: true)
                 }
@@ -231,8 +274,9 @@ struct SongsTab: View {
                         ShelfRow(route: .song(song.id),
                                  title: store.means(song.name),
                                  subtitle: store.means(song.why),
-                                 figure: heard ? store.t("flashHeard", "Heard") : "",
-                                 done: heard)
+                                 figure: heard ? store.t("flashHeard", "Heard") : store.t("flashUnheard", "Not heard yet"),
+                                 done: heard,
+                                 fresh: !heard && Store.fresh(song.added))
                         // A song's deck shares the first word of its id:
                         // naera-naera and naera-words.
                         ForEach(store.decks.filter { $0.level == "song" && first($0.id) == first(song.id) }) {
@@ -264,8 +308,9 @@ struct TalksTab: View {
                         ShelfRow(route: .talk(talk.id),
                                  title: store.means(talk.name),
                                  subtitle: store.means(talk.why),
-                                 figure: read ? store.t("flashRead", "Read") : "",
-                                 done: read)
+                                 figure: read ? store.t("flashRead", "Read") : store.t("flashUnread", "Not read yet"),
+                                 done: read,
+                                 fresh: !read && Store.fresh(talk.added))
                     }
                 }
             }

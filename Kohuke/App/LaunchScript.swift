@@ -7,8 +7,10 @@ import Foundation
 /// it draws — `-kTab 2 -kOpen song:naera-naera` opens the Songs tab with that
 /// song pushed. Launch arguments land in UserDefaults' argument domain, so
 /// nothing is stored and nothing here runs for a reader, who never launches
-/// the app with arguments. `-lang az` and `-style plum` are the keys the app
-/// keeps those two choices under, so they need nothing here.
+/// the app with arguments. `-lang az`, `-style plum` and `-been YES` are the
+/// keys the app keeps those choices under, so they need nothing here; the
+/// last is what makes the Words tab a shelf rather than a stranger's first
+/// card, and CI passes it to every picture but the one of the front door.
 enum LaunchScript {
     static var tab: Int { UserDefaults.standard.integer(forKey: "kTab") }
 

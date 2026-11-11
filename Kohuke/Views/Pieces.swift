@@ -110,11 +110,18 @@ struct Rows<Content: View>: View {
 
 /// One row of a shelf: what it is, the line under it, and where it stands.
 struct ShelfRow: View {
+    @Environment(Store.self) private var store
     let route: Route
     let title: String
     var subtitle: String = ""
     var figure: String = ""
     var done = false
+    /// Something is waiting in it: "6 due", in the accent.
+    var waiting = false
+    /// How much of it is known, drawn as a rule under the row; nil for none.
+    var progress: Double?
+    /// Added in the last fortnight and not yet finished.
+    var fresh = false
     /// A row that follows the one above it: a lesson's deck, a song's words.
     var follows = false
 
@@ -127,9 +134,24 @@ struct ShelfRow: View {
                         .foregroundStyle(Theme.muted)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                        if fresh {
+                            Text(store.t("flashIsNew", "New"))
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.onAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Theme.accent, in: Capsule())
+                        }
+                    }
+                    if let progress {
+                        ProgressView(value: progress)
+                            .tint(done ? Theme.knew : Theme.accent)
+                            .padding(.top, 4)
+                    }
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.footnote)
@@ -141,7 +163,7 @@ struct ShelfRow: View {
                 if !figure.isEmpty {
                     Text(figure)
                         .font(.footnote.monospaced().weight(.medium))
-                        .foregroundStyle(done ? Theme.knew : Theme.muted)
+                        .foregroundStyle(done ? Theme.knew : waiting ? Theme.accent : Theme.muted)
                         .fixedSize()
                 }
                 if done {
@@ -159,19 +181,49 @@ struct ShelfRow: View {
     }
 }
 
-/// A deck's row, which reads the same on every shelf it stands on.
+/// A deck's row, which reads the same on every shelf it stands on:
+/// `deckRow()` on the website. Signed out it says how many cards the deck
+/// has, since nothing is being kept; signed in it says how many are due
+/// where any are, in the accent because that is the reason to open it, and
+/// how many are known where none are — with a rule under the name filled to
+/// that, except on the two gathered decks, which are made of progress
+/// rather than having any.
 struct DeckShelfRow: View {
     @Environment(Store.self) private var store
     let deck: DeckRow
     var follows = false
 
     var body: some View {
+        let tracked = store.signedIn && store.ready
+        let due = deck.due ?? 0
         ShelfRow(route: .deck(deck.id),
                  title: name,
                  subtitle: why,
-                 figure: deck.cards > 0 ? "\(deck.known) / \(deck.cards)" : "",
-                 done: deck.cards > 0 && deck.known >= deck.cards,
+                 figure: !tracked ? store.t("flashCards", "{n} cards", ["n": "\(deck.cards)"])
+                     : due > 0 ? store.t("flashDue", "{n} due", ["n": "\(due)"])
+                     : store.t("flashKnownOf", "{known} / {n}", ["known": "\(deck.known)", "n": "\(deck.cards)"]),
+                 done: tracked && deck.cards > 0 && due == 0 && deck.known >= deck.cards,
+                 waiting: tracked && due > 0,
+                 progress: tracked && !deck.gathered && deck.cards > 0
+                     ? Double(min(deck.known, deck.cards)) / Double(deck.cards) : nil,
+                 fresh: Store.fresh(deck.added) && deck.known < deck.cards,
                  follows: follows)
+    }
+
+    /// The order a stage's decks go in, signed in: `standing()` on the
+    /// website. Started and waiting first, then not started, then the ones
+    /// with nothing due, so a finished deck sinks and rises again on the day
+    /// a card in it comes due. Stable, so ties keep the file's order.
+    static func ordered(_ decks: [DeckRow], tracked: Bool) -> [DeckRow] {
+        guard tracked else { return decks }
+        func standing(_ d: DeckRow) -> Int {
+            if d.cards == 0 { return 2 }
+            if (d.due ?? 0) == 0 { return 3 }
+            return d.known > 0 ? 1 : 2
+        }
+        return decks.enumerated()
+            .sorted { (standing($0.element), $0.offset) < (standing($1.element), $1.offset) }
+            .map(\.element)
     }
 
     private var name: String {
@@ -231,6 +283,10 @@ struct GlossLine: View {
     /// The deck of the song's own words, which a gloss names differently.
     var home: DeckRef?
     var bold = false
+    /// Whether the voice will say it. It says only what the website's
+    /// `data/decks/spoken.json` lists, and a line it does not list would be
+    /// a speaker that always answers that the voice is not answering.
+    var spoken = true
 
     @State private var open: String?
 
@@ -248,7 +304,7 @@ struct GlossLine: View {
                         return .handled
                     })
                 Spacer(minLength: 0)
-                Speaker(text: line.et)
+                if spoken { Speaker(text: line.et) }
             }
             Text(store.means(line))
                 .font(.subheadline)

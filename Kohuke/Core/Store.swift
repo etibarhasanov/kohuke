@@ -104,10 +104,18 @@ final class Store {
 
     private var shelfFile: String { "shelf-\(lang).json" }
 
+    /// The beginnings of the keys of every string of the website's this app
+    /// prints, which is all it asks the route for: `?ui=` in
+    /// `functions/api/flashcard.js`. Without it every answer carried the
+    /// site's twelve hundred strings, sixty-five KB, beside a deck of four.
+    /// A screen that starts printing a key outside these gets its English
+    /// until the prefix is added here.
+    static let uiPrefixes = "flash,account,style,language,close,privacy"
+
     /// The shelf, fresh. On a train it is the last one the phone was given.
     func refresh() async {
         do {
-            let data = try await API.data("api/flashcard", ["lang": lang])
+            let data = try await API.data("api/flashcard", ["lang": lang, "ui": Self.uiPrefixes])
             adopt(data, shelf: true)
             Disk.write(data, shelfFile)
             offline = false
@@ -117,13 +125,15 @@ final class Store {
         loaded = true
     }
 
-    /// One deck, lesson, song or conversation, whole. A 404 is an answer too
-    /// — `error: not-found` — and the screens say the site's sentence for it.
+    /// One deck, lesson, song or conversation, whole, asked for when it is
+    /// opened and not before. It comes without strings (`ui=` and nothing
+    /// after it): the shelf brought them. A 404 is an answer too —
+    /// `error: not-found` — and the screens say the site's sentence for it.
     /// Off the network it is the copy kept from the last time it was opened.
     func open(_ id: String) async -> Answer? {
         let file = "one-\(id)-\(lang).json"
         do {
-            let (data, status) = try await API.fetch("api/flashcard", ["lang": lang, "deck": id])
+            let (data, status) = try await API.fetch("api/flashcard", ["lang": lang, "deck": id, "ui": ""])
             guard let answer = adopt(data, shelf: false) else { return nil }
             if status == 200 { Disk.write(data, file) }
             offline = false
@@ -212,6 +222,7 @@ final class Store {
     /// would be unusable. Signed out it is written down on the phone instead.
     func answer(deck: String, card: String, knew: Bool) {
         noteDay()
+        if !been { been = true }
         guard signedIn, ready else {
             var all = kept
             let key = "\(deck)/\(card)"
@@ -283,6 +294,74 @@ final class Store {
         return (try? JSONDecoder().decode(Answer.self, from: data))?.deck
     }
 
+    // MARK: New, and where somebody left off
+
+    /// Added in the last fourteen days: `NEW_DAYS` on the website.
+    static func fresh(_ added: String?) -> Bool {
+        guard let added, let day = ISO8601DateFormatter().date(from: added + "T12:00:00Z") else { return false }
+        return Date().timeIntervalSince(day) < 14 * 86400
+    }
+
+    /// What this phone last had open — a deck, a lesson, a song or a
+    /// conversation — as `deck:food`, `song:naera-naera`. The phone's and not
+    /// the account's, the way the website keeps `ttb.flash.last` in the
+    /// browser: a phone closed on one deck and a laptop closed on another
+    /// were closed in two places.
+    var last: Route? {
+        get {
+            _ = stamp
+            guard let said = UserDefaults.standard.string(forKey: "last") else { return nil }
+            let bits = said.split(separator: ":", maxSplits: 1).map(String.init)
+            guard bits.count == 2 else { return .deck(said) }
+            switch bits[0] {
+            case "lesson": return .lesson(bits[1])
+            case "song": return .song(bits[1])
+            case "talk": return .talk(bits[1])
+            default: return .deck(bits[1])
+            }
+        }
+        set {
+            let said: String? = newValue.map {
+                switch $0 {
+                case .deck(let id): return "deck:" + id
+                case .lesson(let id): return "lesson:" + id
+                case .song(let id): return "song:" + id
+                case .talk(let id): return "talk:" + id
+                }
+            }
+            UserDefaults.standard.set(said, forKey: "last")
+            stamp += 1
+        }
+    }
+
+    /// Whether this phone has answered a card here before. Until it has, the
+    /// Words tab opens on the first card of Hello and goodbye rather than on
+    /// a shelf of forty decks: the website's front door, `ttb.flash.been`.
+    var been: Bool {
+        get { _ = stamp; return UserDefaults.standard.bool(forKey: "been") }
+        set { UserDefaults.standard.set(newValue, forKey: "been"); stamp += 1 }
+    }
+
+    /// The line the shelf opens with for somebody coming back: how long
+    /// they have been away, or how many days they have run. `helloLine()` on
+    /// the website, which adds how many words are known; the shelf prints
+    /// that on a line of its own under this one.
+    var hello: String {
+        let days = signedIn ? self.days : localDays
+        var said: [String] = []
+        if let days {
+            let gap = Self.daysBetween(days.last, Self.today())
+            if gap > 1 {
+                said.append(t("flashHelloAway", "Welcome back. You’ve been away {n} days.", ["n": "\(gap)"]))
+            } else if days.run > 1 {
+                said.append(t("flashHelloRun", "Welcome back — {n} days in a row.", ["n": "\(days.run)"]))
+            } else {
+                said.append(t("flashHelloBack", "Welcome back."))
+            }
+        }
+        return said.joined(separator: " ")
+    }
+
     // MARK: Days in a row
 
     /// The reader's own calendar day, not Tallinn's: somebody revising at
@@ -312,12 +391,6 @@ final class Store {
 
     private var localDays: Days? {
         UserDefaults.standard.data(forKey: "days").flatMap { try? JSONDecoder().decode(Days.self, from: $0) }
-    }
-
-    /// How many days in a row, where it is more than one and still going.
-    var daysRunning: Int {
-        guard let days = signedIn ? days : localDays else { return 0 }
-        return Self.daysBetween(days.last, Self.today()) <= 1 && days.run > 1 ? days.run : 0
     }
 }
 
