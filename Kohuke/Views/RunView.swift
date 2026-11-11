@@ -43,6 +43,13 @@ struct RunView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button(store.t("flashEdit", "Edit the words")) { editing = true }
                 }
+            } else if let run, run.deck.review != true && run.deck.missed != true {
+                // A deck somebody wrote is theirs alone, and the two gathered
+                // decks are made of one person's answers: none of the three
+                // has an address anybody else could open.
+                ToolbarItem(placement: .primaryAction) {
+                    ShareLink(item: API.link(run.deck.id, lang: store.lang))
+                }
             }
         }
         .sheet(isPresented: $editing) {
@@ -80,7 +87,7 @@ struct RunView: View {
         let made = Run(deck: deck, words: store.words)
         if LaunchScript.turned { made.turned = true }
         run = made
-        UserDefaults.standard.set(id, forKey: "last")
+        store.last = .deck(id)
     }
 
     private func name(_ deck: Deck) -> String {
@@ -119,6 +126,13 @@ struct RunView: View {
             .buttonStyle(.prominent)
             .controlSize(.large)
         } else if let card = run.current {
+            // The front door's one line, over a stranger's first card, gone
+            // once a card has been answered.
+            if !store.been && run.deck.id == WordsTab.firstDeck {
+                Text(store.t("flashHelloFirst", "Estonian, one card at a time. Here’s the first."))
+                    .font(.title3)
+                    .foregroundStyle(Theme.ink)
+            }
             study(run, card)
         } else if run.queue.isEmpty {
             rested(run)

@@ -92,5 +92,15 @@ enum API {
     // The addresses the website shares, so a link opened from the app lands
     // on the same thing in a browser.
     static let site = URL(string: "https://flashcard.tallinntastebuds.ee")!
+
+    /// The address of a deck, lesson, song or conversation on the website,
+    /// `?d=<id>`, in the language it is being read in: what Share sends, so
+    /// whoever it is sent to opens the same thing in a browser.
+    static func link(_ id: String, lang: String) -> URL {
+        var parts = URLComponents(url: site, resolvingAgainstBaseURL: false)!
+        parts.path = "/"
+        parts.queryItems = [URLQueryItem(name: "d", value: id), URLQueryItem(name: "lang", value: lang)]
+        return parts.url!
+    }
     static let privacy = base.appendingPathComponent("privacy")
 }

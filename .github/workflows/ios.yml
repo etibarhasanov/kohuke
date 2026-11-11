@@ -105,11 +105,16 @@ jobs:
           shot() {
             local name="$1"; shift
             xcrun simctl terminate "$dev" "$bundle" >/dev/null 2>&1 || true
-            xcrun simctl launch "$dev" "$bundle" "$@" >/dev/null
+            xcrun simctl launch "$dev" "$bundle" -been YES "$@" >/dev/null
             sleep 12
             xcrun simctl io "$dev" screenshot "screens/$name.png" >/dev/null
             echo "photographed $name"
           }
+          # A stranger: no -been, so the Words tab opens on the first card.
+          xcrun simctl launch "$dev" "$bundle" >/dev/null
+          sleep 12
+          xcrun simctl io "$dev" screenshot "screens/00-first-open.png" >/dev/null
+          echo "photographed 00-first-open"
           shot 01-words
           shot 02-card-front -kOpen deck:greetings
           shot 03-card-back -kOpen deck:greetings -kTurned YES

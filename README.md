@@ -39,10 +39,20 @@ Five tabs.
   *At a restaurant* are open to everybody; *Getting by* opens at a hundred
   words known and *Going deeper* at four hundred, and a stage that has not
   opened is its heading and one line saying how far off it is. **Start** at
-  the top goes back to the deck in hand. Above the headings, once there is
-  anything in them, stand the two decks that are gathered rather than
-  written: *Words you missed* and *Words you know*. Below them, signed in,
-  the decks you wrote yourself and a field to name a new one.
+  the top goes back to whatever was left half done — a deck, a lesson, a
+  song or a conversation — and otherwise to the first deck with cards
+  waiting. Above the headings, once there is anything in them, stand the two
+  decks that are gathered rather than written: *Words you missed* and *Words
+  you know*. Below them, signed in, the decks you wrote yourself and a field
+  to name a new one. Signed in, a deck's row says how many cards are due, in
+  the accent, or how many are known, with a rule under its name filled to
+  that; within each heading the decks with cards due go first and a finished
+  one sinks. Anything added in the last fortnight says **New**. The shelf
+  opens with *Welcome back*, or how many days in a row, or how long it has
+  been.
+- **The first time**, the Words tab is not a shelf. It is **Tere**, the first
+  card of *Hello and goodbye*, the way the website greets a stranger: one
+  card shows what the app does better than forty decks to choose from.
 - **Grammar.** Short lessons on why the words change, each followed by its
   own deck where it has one, and the cases one by one under a heading of
   their own. A lesson is prose, tables of forms and example sentences; every
@@ -54,6 +64,9 @@ Five tabs.
 - **Conversations.** Sheets from a language course: a question and the turns
   that answer it, a sentence at a time, translated, every word pressable and
   every sentence spoken.
+- **Share**, at the top of any deck, lesson, song or conversation the site
+  ships, sends its address on the website, so whoever gets it can open it in
+  a browser without the app.
 - **Me.** Signing in or making an account — Apple, Google, or a username and
   a password — signing out, deleting the account; the language the cards are
   turned over into; the colour, which is one of the website's four styles.
@@ -97,14 +110,25 @@ cannot be updated in a day, and they are listed in the website repository's
 
 | | |
 |---|---|
-| `GET /api/flashcard?lang=` | the shelf: decks, lessons, songs, conversations, how many words are known, who is asking, and the screen's words (`ui`) |
-| `GET /api/flashcard?lang=&deck=<id>` | one deck with its cards, or one lesson, song or conversation, whole |
+| `GET /api/flashcard?lang=&ui=<prefixes>` | the shelf: decks, lessons, songs, conversations, how many words are known, who is asking, and the strings the app prints (`ui`, only the keys starting with `Store.uiPrefixes`) |
+| `GET /api/flashcard?lang=&deck=<id>&ui=` | one deck with its cards, or one lesson, song or conversation, whole, and no strings |
 | `POST /api/flashcard` | `knew`, `again`, `reset`, `report`, and for a deck of your own `deck`, `rename`, `drop`, `card`, `editcard`, `uncard` |
 | `GET /api/say?take=&text=` | the Estonian voice, as a WAV |
 | `GET /api/account` | who the session is, and `appGoogle` / `appApple` |
 | `POST /api/account` | `login`, `create`, `ticket`, `logout`, `delete` |
 | `GET /api/google?app=<challenge>` | the Google round trip, ending at `tallinntastebuds://signin` |
 | `POST /api/apple` | Apple's token and its nonce, answered as a sign-in |
+
+**It asks for what it shows, when it shows it.** The shelf is one request
+and carries only counts — how many cards a deck has, not the cards. A deck,
+a lesson, a song or a conversation is asked for when it is opened, and not
+before; nothing downloads the whole of the website's decks. The strings come
+with the shelf and only the ones the app prints, two hundred of the site's
+twelve hundred — `?ui=` on the route, whose list of key prefixes is
+`Store.uiPrefixes` — and a deck comes with none. That made the shelf a third
+of the size it was and a deck four KB instead of seventy. A screen that
+starts printing a key outside those prefixes shows its English until the
+prefix is added.
 
 **Sign in with Apple needs the website to know this app.** Apple signs its
 token for a bundle id, and the website refuses one made for an app it does

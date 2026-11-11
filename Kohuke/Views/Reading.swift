@@ -55,10 +55,16 @@ struct LessonView: View {
         }
         .navigationTitle(store.t(lesson?.underCases == true ? "flashCases" : "flashGrammar",
                                  lesson?.underCases == true ? "The cases, one by one" : "Grammar"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: API.link(id, lang: store.lang))
+            }
+        }
         .task {
             guard lesson == nil else { return }
             lesson = await store.open(id)?.lesson
             missing = lesson == nil
+            if lesson != nil { store.last = .lesson(id) }
         }
         .onDisappear { Voice.shared.hush() }
     }
@@ -199,10 +205,16 @@ struct SongView: View {
             }
         }
         .navigationTitle(store.t("flashSongs", "Songs"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: API.link(id, lang: store.lang))
+            }
+        }
         .task {
             guard song == nil else { return }
             song = await store.open(id)?.song
             missing = song == nil
+            if song != nil { store.last = .song(id) }
         }
         .onDisappear { Voice.shared.hush() }
     }
@@ -233,7 +245,10 @@ struct TalkView: View {
                     ForEach(Array((talk.scenes ?? []).enumerated()), id: \.offset) { _, scene in
                         VStack(alignment: .leading, spacing: 14) {
                             if let ask = scene.ask {
-                                GlossLine(line: ask, words: talk.words, bold: true)
+                                // Not spoken: the voice says what the course
+                                // gives each person to say, and the question
+                                // is the sheet's heading rather than a line.
+                                GlossLine(line: ask, words: talk.words, bold: true, spoken: false)
                             }
                             ForEach(Array((scene.turns ?? []).enumerated()), id: \.offset) { _, turn in
                                 VStack(alignment: .leading, spacing: 10) {
@@ -258,10 +273,16 @@ struct TalkView: View {
             }
         }
         .navigationTitle(store.t("flashTalks", "Conversations"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: API.link(id, lang: store.lang))
+            }
+        }
         .task {
             guard talk == nil else { return }
             talk = await store.open(id)?.talk
             missing = talk == nil
+            if talk != nil { store.last = .talk(id) }
         }
         .onDisappear { Voice.shared.hush() }
     }

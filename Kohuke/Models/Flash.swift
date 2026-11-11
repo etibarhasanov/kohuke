@@ -82,6 +82,8 @@ struct DeckRow: Decodable, Identifiable, Hashable {
     let known: Int
     let due: Int?
     let own: Bool?
+    /// The day it went in, `2026-09-18`, which is what New is judged by.
+    let added: String?
     /// The two that are assembled rather than stored: every card somebody
     /// got wrong, and every card they know.
     let review: Bool?
@@ -139,6 +141,7 @@ struct Lesson: Decodable, Identifiable, Hashable {
     let name: Said
     let why: Said?
     let taste: String?
+    let added: String?
     /// The deck that follows the lesson, where it has one.
     let deck: String?
     /// `cases` for the lessons under "The cases, one by one".
@@ -186,6 +189,7 @@ struct Song: Decodable, Identifiable, Hashable {
     let name: Said
     let why: Said?
     let taste: String?
+    let added: String?
     var heard: Bool?
     /// The YouTube id of the recording.
     let video: String?
@@ -206,6 +210,7 @@ struct Talk: Decodable, Identifiable, Hashable {
     let name: Said
     let why: Said?
     let taste: String?
+    let added: String?
     var read: Bool?
     let source: String?
     let scenes: [Scene]?
