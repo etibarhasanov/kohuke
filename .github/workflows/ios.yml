@@ -11,8 +11,18 @@ permissions:
 on:
   push:
     branches: [main, 'claude/**']
+    # A change to the words about the app is not a change to the app, and a
+    # macOS runner is the dearest minute GitHub sells.
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
+
+# A newer push to the same branch makes the older build moot. Packages are
+# made by release.yml, only when asked, and never here.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

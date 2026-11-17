@@ -1,0 +1,183 @@
+name: package
+
+# Makes a signed build of the app and, unless told not to, sends it to
+# TestFlight. It is the other half of build.yml: that one runs on every push
+# and only proves the app still compiles for the simulator; this one runs
+# only when somebody asks for a package, so a push never spends a build
+# number, a signing round-trip or forty minutes of a macOS runner on a
+# package nobody is going to install.
+#
+# Two ways to ask:
+#   - Actions → package → Run workflow, on any branch. The `upload` box
+#     decides between TestFlight and an .ipa left on the run as an artifact.
+#   - Push a tag that starts with v (v1.2, v1.2.1). The version in the tag
+#     becomes the version people see, and the build goes to TestFlight.
+#
+# Signing is Xcode's automatic signing driven by an App Store Connect API
+# key, so there is no certificate or provisioning profile to export, rotate
+# or keep in the repository: Xcode asks Apple for what it needs at archive
+# time. The key, the team and nothing else live in the repository's secrets;
+# docs/RELEASING.md says how to make them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Send the build to TestFlight (untick for an .ipa only)
+        type: boolean
+        default: true
+  push:
+    tags: ['v*']
+
+# One package at a time per branch or tag; a second press waits rather than
+# racing the first for the same build number.
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: Kohuke.xcodeproj
+  SCHEME: Kohuke
+  # Build numbers are this plus the run number, so they only ever go up and
+  # never collide with the ones uploaded by hand from Xcode before this
+  # workflow existed. Raise it if App Store Connect says a number is taken.
+  BUILD_NUMBER_BASE: 100
+
+jobs:
+  package:
+    name: Archive, sign and package
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the signing secrets are set
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=0
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!name}" ]; then echo "::error::The secret $name is not set. docs/RELEASING.md says how to make it."; missing=1; fi
+          done
+          exit $missing
+
+      - name: Show the selected Xcode
+        run: xcodebuild -version
+
+      # The key goes where altool looks for it as well as where xcodebuild is
+      # told to, and is removed at the end whatever happened.
+      - name: Put the App Store Connect key in place
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          dir="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$dir"
+          printf '%s\n' "$ASC_KEY_P8" > "$dir/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$dir/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$dir/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Work out the version and build number
+        run: |
+          build=$(( BUILD_NUMBER_BASE + GITHUB_RUN_NUMBER ))
+          echo "BUILD_NUMBER=$build" >> "$GITHUB_ENV"
+          version=""
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "MARKETING_VERSION=$version" >> "$GITHUB_ENV"
+          fi
+          echo "build number $build${version:+, version $version (from the tag)}"
+
+      - name: Archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          archive=(xcodebuild archive
+            -project "$PROJECT"
+            -scheme "$SCHEME"
+            -configuration Release
+            -destination 'generic/platform=iOS'
+            -archivePath "build/$SCHEME.xcarchive"
+            -allowProvisioningUpdates
+            -authenticationKeyPath "$ASC_KEY_PATH"
+            -authenticationKeyID "$ASC_KEY_ID"
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+            CODE_SIGN_STYLE=Automatic
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER")
+          if [ -n "${MARKETING_VERSION:-}" ]; then archive+=(MARKETING_VERSION="$MARKETING_VERSION"); fi
+          if command -v xcbeautify >/dev/null 2>&1; then
+            "${archive[@]}" | xcbeautify --renderer github-actions
+          else
+            "${archive[@]}"
+          fi
+
+      - name: Export the .ipa
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > build/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>export</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "build/$SCHEME.xcarchive" \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          ls -la build/export
+          ipa=$(ls build/export/*.ipa | head -1)
+          echo "IPA=$ipa" >> "$GITHUB_ENV"
+
+      # The .ipa and the debug symbols stay on the run for 30 days either
+      # way, so a crash report from TestFlight can be read against them.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SCHEME }}-${{ env.BUILD_NUMBER }}
+          path: |
+            build/export/*.ipa
+            build/${{ env.SCHEME }}.xcarchive/dSYMs
+          retention-days: 30
+
+      - name: Send it to TestFlight
+        if: github.event_name == 'push' || inputs.upload
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app --type ios --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          {
+            echo "### Build $BUILD_NUMBER sent to TestFlight"
+            echo
+            echo "It appears in App Store Connect → TestFlight after Apple has processed it, usually 5–15 minutes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$HOME/.appstoreconnect"
