@@ -77,6 +77,7 @@ jobs:
           check "display name"      '"CFBundleDisplayName" => "Kohuke"'
           check "bundle id"         '"CFBundleIdentifier" => "ee.tallinntastebuds.kohuke"'
           check "encryption answer" '"ITSAppUsesNonExemptEncryption"'
+          check "launch screen colour" '"UIColorName" => "LaunchPaper"'
           exit $fail
 
       # Nobody can look at a simulator from a cloud session, so the app is
