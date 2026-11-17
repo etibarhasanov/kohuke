@@ -11,7 +11,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A1B2C3D400000000000000A2 /* Kohuke */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Kohuke; sourceTree = "<group>"; };
+		A1B2C3D400000000000000A2 /* Kohuke */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Kohuke;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
