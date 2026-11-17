@@ -2,12 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Every key the app needs is a build setting (INFOPLIST_KEY_* in the
-	     project), which Xcode merges into the Info.plist it generates. This
-	     file stays for the keys Xcode has no build setting for, and there are
-	     none yet.
+	<!-- Nearly every key the app needs is a build setting (INFOPLIST_KEY_* in
+	     the project), which Xcode merges into the Info.plist it generates.
+	     This file is for the keys Xcode has no build setting for.
 
 	     It lives outside Kohuke/ because that folder is a synchronised group:
-	     a plist inside it would also be copied into the bundle as a resource. -->
+	     a plist inside it would also be copied into the bundle as a resource.
+
+	     UILaunchScreen is what iOS draws while the app starts, before any of
+	     its code has run. Xcode's generated one is empty, which iOS draws in
+	     the system background: black on a phone set to dark, and then the
+	     app arrived in its pale blue. LaunchPaper (Assets.xcassets) is the
+	     paper of the style a new install opens in, Blue, in both
+	     appearances, since the app draws that style whatever the phone is
+	     set to. Somebody who chose one of the two night styles sees the pale
+	     blue for a moment first: the launch screen is fixed at build time
+	     and cannot know. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchPaper</string>
+	</dict>
 </dict>
 </plist>
