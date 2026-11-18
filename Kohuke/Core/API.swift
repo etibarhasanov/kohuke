@@ -30,9 +30,35 @@ enum API {
         return URLSession(configuration: config)
     }()
 
+    /// Which version of the site's API this build asks. Every route Kohuke
+    /// reads answers under `/api/v1/` as well as under its old `/api/`
+    /// address, and a version in the address is a promise that it only ever
+    /// gains fields: a change that would break a build in somebody's pocket
+    /// is `/api/v2`, beside this one, and v1 keeps answering for at least six
+    /// months. **The public API** in the website's `docs/handbook.md`; the
+    /// map app's and Rattatee's `API.versioned()` are the same function.
+    static let version = "v1"
+
+    /// The two routes whose v1 name is not their old one, because the
+    /// website's public reads hold `places` and `lists` under `/api/v1/`.
+    /// Kohuke asks for neither today; they are here so the three apps turn
+    /// a path into an address the same way.
+    private static let renamed = ["places": "find", "lists": "me/lists"]
+
+    /// `api/<route>` as the code writes it, at this build's version:
+    /// `api/flashcard` is `api/v1/flashcard`, `api/say` is `api/v1/say`. A
+    /// path that already names its version, and anything that is not a
+    /// route, are left as they are.
+    static func versioned(_ path: String) -> String {
+        guard path.hasPrefix("api/") else { return path }
+        let route = String(path.dropFirst("api/".count))
+        if route.range(of: #"^v[0-9]+/"#, options: .regularExpression) != nil { return path }
+        return "api/\(version)/" + (renamed[route] ?? route)
+    }
+
     /// A URL on the site, with an optional query.
     static func url(_ path: String, _ query: [String: String] = [:]) -> URL {
-        var parts = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        var parts = URLComponents(url: base.appendingPathComponent(versioned(path)), resolvingAgainstBaseURL: false)!
         if !query.isEmpty {
             parts.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
