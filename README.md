@@ -184,7 +184,10 @@ live website.
 
 ### CI
 
-`.github/workflows/ios.yml` builds for the simulator on every push, then
+`.github/workflows/ios.yml` builds for the simulator when somebody asks for
+it — Actions → build → Run workflow, on the branch to check; since
+2026-11-18 a push no longer starts it, to spare twenty minutes of a macOS
+runner a push — then
 launches the app on each screen worth seeing and photographs it. The
 pictures are the run's `screens` artifact, and for a `claude/` branch they
 are also pushed, shrunk, to the `ci-screens` branch, which is how a session
