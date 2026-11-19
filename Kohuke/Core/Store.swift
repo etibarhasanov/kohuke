@@ -119,6 +119,8 @@ final class Store {
             adopt(data, shelf: true)
             Disk.write(data, shelfFile)
             offline = false
+            // The site is answering: the moment to send what it missed.
+            if !unsent.isEmpty { Task { await send() } }
         } catch {
             offline = true
         }
@@ -217,9 +219,11 @@ final class Store {
     }
 
     /// One answer: a card known or missed, a lesson read, a song heard. It
-    /// does not wait and a failure is silent — what a lost write costs is the
-    /// card coming round again, and a card that hung on the network each time
-    /// would be unusable. Signed out it is written down on the phone instead.
+    /// does not wait: a card that hung on the network each time would be
+    /// unusable. Signed in it is written down first (`unsent` below) and
+    /// crossed off when the site has it, so an answer given in a tunnel, or
+    /// on a day the site is refusing, goes out later instead of being lost.
+    /// Signed out it is written down on the phone until there is an account.
     func answer(deck: String, card: String, knew: Bool) {
         noteDay()
         if !been { been = true }
@@ -231,8 +235,8 @@ final class Store {
             kept = all
             return
         }
-        let body: [String: Any] = ["action": knew ? "knew" : "again", "deck": deck, "card": card, "day": Self.today()]
-        Task { _ = try? await API.post("api/flashcard", body) }
+        hold(deck: deck, card: card, knew: knew)
+        Task { await send() }
     }
 
     /// A lesson read, a song heard or a conversation read: the same answer a
@@ -244,7 +248,8 @@ final class Store {
             answer(deck: shelf, card: id, knew: true)
             return
         }
-        _ = try? await API.post("api/flashcard", ["action": "knew", "deck": shelf, "card": id, "day": Self.today()])
+        hold(deck: shelf, card: id, knew: true)
+        await send()
         await refresh()
     }
 
@@ -259,26 +264,142 @@ final class Store {
     func nudge(words by: Int) { words = max(0, words + by) }
 
     /// Everything the phone was holding, now that there is an account to put
-    /// it in. Cleared before the writes go out: a failure halfway loses the
-    /// rest rather than sending them all twice.
+    /// it in: moved to the answers waiting to be sent, which keeps each one
+    /// until the site has taken it.
     func sendKept() async {
         let all = kept
         guard signedIn, !all.isEmpty else { return }
-        kept = [:]
         for (key, knew) in all {
             guard let slash = key.firstIndex(of: "/") else { continue }
-            _ = try? await API.post("api/flashcard", [
-                "action": knew ? "knew" : "again",
-                "deck": String(key[..<slash]),
-                "card": String(key[key.index(after: slash)...]),
-                "day": Self.today()
-            ])
+            hold(deck: String(key[..<slash]), card: String(key[key.index(after: slash)...]), knew: knew)
+        }
+        kept = [:]
+        await send()
+    }
+
+    /// Start a deck again: forget what is known of it, and what was still
+    /// waiting to be sent of it, which would otherwise come back afterwards.
+    func reset(_ deck: String) async throws {
+        try await API.post("api/flashcard", ["action": "reset", "deck": deck])
+        unsent.removeAll { $0.user == user && $0.deck == deck }
+    }
+
+    // MARK: Answers not yet sent
+
+    /// An answer the site has not taken yet, and whose it is: the phone may
+    /// be signed in as somebody else by the time it can be sent.
+    private struct Unsent: Codable, Equatable {
+        let user: String
+        let deck: String
+        let card: String
+        let knew: Bool
+        let day: String
+    }
+
+    private static let unsentKey = "unsent"
+    /// More than anybody answers in a day off the network; past it the
+    /// oldest goes.
+    private static let maxUnsent = 500
+
+    /// The answers waiting, oldest first, kept in UserDefaults so that they
+    /// outlive the app being closed.
+    private var unsent: [Unsent] {
+        get {
+            UserDefaults.standard.data(forKey: Self.unsentKey)
+                .flatMap { try? JSONDecoder().decode([Unsent].self, from: $0) } ?? []
+        }
+        set {
+            if newValue.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Self.unsentKey)
+            } else if let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: Self.unsentKey)
+            }
         }
     }
 
-    /// Start a deck again: forget what is known of it.
-    func reset(_ deck: String) async throws {
-        try await API.post("api/flashcard", ["action": "reset", "deck": deck])
+    /// The one send that is going, so that two never send the same answer.
+    private var sending: Task<Void, Never>?
+
+    /// Writes an answer down to be sent. A card answered again before its
+    /// first answer went out replaces it: the last word on a card is the one
+    /// the site should have.
+    private func hold(deck: String, card: String, knew: Bool) {
+        guard let user else { return }
+        var all = unsent.filter { !($0.user == user && $0.deck == deck && $0.card == card) }
+        all.append(Unsent(user: user, deck: deck, card: card, knew: knew, day: Self.today()))
+        if all.count > Self.maxUnsent { all.removeFirst(all.count - Self.maxUnsent) }
+        unsent = all
+    }
+
+    /// Sends what is waiting, one at a time and in the order it was answered.
+    /// Called by every answer, by every shelf that arrives — a launch, coming
+    /// back to the app, the end of a run — and on signing in. It answers when
+    /// the queue is empty or the site has stopped taking answers.
+    func send() async {
+        if let sending {
+            await sending.value
+            return
+        }
+        let task = Task { await self.drain() }
+        sending = task
+        await task.value
+    }
+
+    /// It stops at the first answer the site does not take, and does not try
+    /// again by itself: the next answer or the next shelf does. So a site
+    /// that is down is asked no more often than it was before there was a
+    /// queue, once an answer.
+    ///
+    /// What the site said decides what becomes of the answer:
+    /// - taken: crossed off;
+    /// - the network failed, so the site said nothing: kept where it is;
+    /// - 5xx, 429, 408 or 401 — the site is down, out of its day's
+    ///   allowance, or no longer knows the session: kept, and moved to the
+    ///   back, so that one answer the site chokes on does not hold up the
+    ///   rest for ever;
+    /// - any other refusal — a card that is no longer in its deck, a deck
+    ///   that was deleted: dropped, since asking again will not change it.
+    ///
+    /// An answer sent twice, because the site took it and the phone never
+    /// heard, does no harm: the site's totals count a card once however
+    /// often it is answered the same way.
+    private func drain() async {
+        defer { sending = nil }
+        while signedIn, ready, let next = unsent.first(where: { $0.user == user }) {
+            do {
+                try await API.post("api/flashcard", [
+                    "action": next.knew ? "knew" : "again",
+                    "deck": next.deck,
+                    "card": next.card,
+                    "day": next.day
+                ])
+                cross(next)
+            } catch let refusal as API.Refusal {
+                let later = refusal.status >= 500 || [401, 408, 429].contains(refusal.status)
+                let waiting = unsent.contains(next)
+                cross(next)
+                if later {
+                    if waiting { unsent.append(next) }
+                    return
+                }
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func cross(_ one: Unsent) {
+        var all = unsent
+        if let at = all.firstIndex(of: one) {
+            all.remove(at: at)
+            unsent = all
+        }
+    }
+
+    /// What was waiting is thrown away with the rest of what the phone held
+    /// of somebody, when they sign out or delete the account.
+    func forgetUnsent() {
+        unsent = []
     }
 
     /// Say a card the site ships is wrong. The one write that needs nobody.
