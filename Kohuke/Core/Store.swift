@@ -161,6 +161,7 @@ final class Store {
     func open(_ id: String) async -> Answer? {
         let file = "one-\(id)-\(lang).json"
         if let kept = current(id, file) { return kept }
+        if let made = await fromFiles(id, file) { return made }
         do {
             let (data, status) = try await API.fetch("api/flashcard", ["lang": lang, "deck": id, "ui": ""])
             guard let answer = adopt(data, shelf: false) else { return nil }
@@ -222,6 +223,147 @@ final class Store {
             return answer
         }
         return nil
+    }
+
+    // MARK: The words, from the site's files
+
+    /// The names of every deck the site ships, by id, out of the site's
+    /// index: asked for once, and only when a song or a conversation names a
+    /// deck that is not on this person's shelf.
+    private var shippedNames: [String: Any]?
+
+    /// One of the files the website keeps its decks in, `data/decks/<name>.json`:
+    /// a deck, a lesson, a song or a conversation, whole, or the index. They
+    /// are files and not a Function, so asking for one runs nothing on the
+    /// site and reads nothing from its database, and an unchanged one is
+    /// answered from the phone's own cache after a word with the site.
+    private func siteFile(_ name: String) async -> [String: Any]? {
+        guard name.range(of: #"^[a-z0-9-]+$"#, options: .regularExpression) != nil,
+              let (data, status) = try? await API.fetch("data/decks/\(name).json"), status == 200 else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    /// A deck by its id and name, the way the route names one where the
+    /// file only points at it: `named()` in `songAnswer()`.
+    private func named(_ id: Any?, _ names: [String: Any]) -> [String: Any]? {
+        guard let id = id as? String, let name = names[id] else { return nil }
+        return ["id": id, "name": name]
+    }
+
+    /// The names of the decks these ids are, from the shelf where it has
+    /// them all and from the site's index where it does not: the shelf
+    /// leaves out the decks of a stage that has not opened.
+    private func names(of ids: Set<String>) async -> [String: Any]? {
+        var all: [String: Any] = [:]
+        for row in decks { if let name = row.name { all[row.id] = name.raw } }
+        if ids.allSatisfy({ all[$0] != nil }) { return all }
+        if shippedNames == nil, let list = await siteFile("index")?["decks"] as? [[String: Any]] {
+            var read: [String: Any] = [:]
+            for one in list { if let id = one["id"] as? String, let name = one["name"] { read[id] = name } }
+            shippedNames = read
+        }
+        return shippedNames
+    }
+
+    /// A deck, a lesson, a song or a conversation put together on the phone
+    /// out of the site's file and what the shelf says of it, in the shape
+    /// the route answers in, where that can be done without asking the
+    /// route — which is the only part of opening something that costs the
+    /// site a Function and its database. Nothing where it cannot, and then
+    /// `open()` asks the route as it always did.
+    ///
+    /// A lesson, a song or a conversation always can: the words are the
+    /// file, and whether it was read is on its row. A deck can when the
+    /// phone can tell which of its cards are known:
+    ///
+    /// - none, where its row says none are, which is every deck a stranger
+    ///   or a new account opens;
+    /// - all, where its row says all are;
+    /// - the ones the phone's last copy has known, where they are as many
+    ///   as the row says.
+    ///
+    /// Otherwise somebody has answered cards somewhere else, and only the
+    /// route knows which. The gathered decks, a deck somebody wrote and a
+    /// deck that is not on the shelf are the route's as well.
+    ///
+    /// What the route does to a file on its way out is done here the same:
+    /// `deckAnswer()`, `lessonAnswer()`, `songAnswer()` and `talkAnswer()` in
+    /// `functions/api/flashcard.js`.
+    private func fromFiles(_ id: String, _ file: String) async -> Answer? {
+        guard loaded, !offline else { return nil }
+        var made: [String: Any]
+
+        if let row = decks.first(where: { $0.id == id }) {
+            guard !row.gathered, row.own != true else { return nil }
+            var knownIds: Set<String>?
+            if row.known > 0 && row.known < row.cards {
+                guard let kept = Disk.read(file).flatMap({ try? JSONDecoder().decode(Answer.self, from: $0) })?.deck
+                else { return nil }
+                knownIds = Set(kept.cards.filter { $0.known == true }.map(\.id))
+            }
+            guard var deck = await siteFile(id), let cards = deck["cards"] as? [[String: Any]],
+                  cards.count == row.cards else { return nil }
+            if let knownIds {
+                guard cards.filter({ knownIds.contains($0["id"] as? String ?? "") }).count == row.known else { return nil }
+            }
+            let all = row.known >= row.cards && row.cards > 0
+            deck["own"] = false
+            deck["cards"] = cards.map { card -> [String: Any] in
+                var card = card
+                card["deck"] = id
+                if (card["forms"] as? [Any])?.isEmpty != false { card.removeValue(forKey: "forms") }
+                let sentence = card["sentence"] as? [String: Any]
+                if (sentence?["et"] as? String ?? "").isEmpty || (sentence?["en"] as? String ?? "").isEmpty {
+                    card.removeValue(forKey: "sentence")
+                }
+                let known = all || knownIds?.contains(card["id"] as? String ?? "") == true
+                card["known"] = known
+                card["due"] = !known
+                return card
+            }
+            made = ["deck": deck]
+        } else if let row = lessons.first(where: { $0.id == id }) {
+            guard var lesson = await siteFile(id), lesson["body"] != nil else { return nil }
+            lesson["read"] = row.read ?? false
+            made = ["lesson": lesson]
+        } else if let row = songs.first(where: { $0.id == id }) {
+            guard let written = await siteFile(id), written["verses"] != nil,
+                  var song = await pointed(written) else { return nil }
+            song["heard"] = row.heard ?? false
+            made = ["song": song]
+        } else if let row = talks.first(where: { $0.id == id }) {
+            guard let written = await siteFile(id), written["scenes"] != nil,
+                  var talk = await pointed(written) else { return nil }
+            talk["read"] = row.read ?? false
+            made = ["talk": talk]
+        } else {
+            return nil
+        }
+
+        guard let data = try? JSONSerialization.data(withJSONObject: made),
+              let answer = try? JSONDecoder().decode(Answer.self, from: data) else { return nil }
+        Disk.write(data, file)
+        return answer
+    }
+
+    /// A song or a conversation with every deck it points at named: its own
+    /// deck of words, and the deck each of its words is taught in.
+    private func pointed(_ one: [String: Any]) async -> [String: Any]? {
+        var words = one["words"] as? [String: [String: Any]] ?? [:]
+        var ids = Set(words.values.compactMap { $0["deck"] as? String })
+        if let its = one["deck"] as? String { ids.insert(its) }
+        guard let titles = await names(of: ids) else { return nil }
+        for key in words.keys {
+            if let deck = named(words[key]?["deck"], titles) {
+                words[key]?["deck"] = deck
+            } else {
+                words[key]?.removeValue(forKey: "deck")
+            }
+        }
+        var next = one
+        next["words"] = words
+        if let deck = named(one["deck"], titles) { next["deck"] = deck } else { next.removeValue(forKey: "deck") }
+        return next
     }
 
     /// Marks a card in the phone's copy of its deck the way the site will

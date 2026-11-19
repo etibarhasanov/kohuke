@@ -37,6 +37,10 @@ struct Said: Decodable, Hashable {
 
     /// Whether this came keyed by language, which only the site's own words do.
     var shipped: Bool { plain == nil }
+
+    /// As it was written in the answer it came out of: the one string, or
+    /// the object keyed by language.
+    var raw: Any { plain.map { $0 as Any } ?? by }
 }
 
 /// Every answer of the route, whichever it is: the shelf (`decks`, `lessons`,
