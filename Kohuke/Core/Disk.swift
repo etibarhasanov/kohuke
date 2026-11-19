@@ -23,6 +23,34 @@ enum Disk {
         try? data.write(to: folder.appendingPathComponent(name), options: .atomic)
     }
 
+    /// How long ago the site gave the phone a file, or nothing where there
+    /// is no such file.
+    static func age(_ name: String) -> TimeInterval? {
+        let path = folder.appendingPathComponent(name).path
+        guard let written = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date else {
+            return nil
+        }
+        return Date().timeIntervalSince(written)
+    }
+
+    /// Changes a kept answer in place — a card marked known in a deck the
+    /// phone holds — without reading it into the app's own shapes, so that
+    /// a field this build does not know is still there afterwards. The file
+    /// keeps the date it had: `age` is how long since the site was asked,
+    /// and the phone's own note is not the site's answer.
+    static func edit(_ name: String, _ change: (inout [String: Any]) -> Void) {
+        let url = folder.appendingPathComponent(name)
+        guard let data = try? Data(contentsOf: url),
+              var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
+        let written = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate]
+        change(&object)
+        guard let next = try? JSONSerialization.data(withJSONObject: object) else { return }
+        try? next.write(to: url, options: .atomic)
+        if let written {
+            try? FileManager.default.setAttributes([.modificationDate: written], ofItemAtPath: url.path)
+        }
+    }
+
     /// Everything kept, gone: what the phone held of somebody's shelf goes
     /// when they sign out.
     static func forget() {
