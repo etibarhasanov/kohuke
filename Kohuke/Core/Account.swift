@@ -85,6 +85,7 @@ extension Store {
             for cookie in cookies where cookie.name == "ttb_s" { HTTPCookieStorage.shared.deleteCookie(cookie) }
         }
         Disk.forget()
+        forgetUnsent()
         await refresh()
     }
 }

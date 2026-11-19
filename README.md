@@ -96,8 +96,11 @@ which ones you knew. Signing in sends the five along.
 ### Off the network
 
 The shelf and everything that has been opened are kept on the phone, so a
-deck opened once can be read on a plane. Answers given there are not kept
-for later: what a lost answer costs is the card coming round again.
+deck opened once can be read on a plane. Answers given there, signed in, are
+written down on the phone and sent when the site next answers — the next
+card, the next launch, the next time the app comes to the front — so a
+sitting in a tunnel, or on a day the site is over its allowance, is not
+lost. `Store.drain()` says what is kept, what is dropped and when it asks.
 
 ---
 
