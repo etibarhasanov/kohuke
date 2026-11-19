@@ -125,7 +125,20 @@ cannot be updated in a day, and they are listed in the website repository's
 **It asks for what it shows, when it shows it.** The shelf is one request
 and carries only counts — how many cards a deck has, not the cards. A deck,
 a lesson, a song or a conversation is asked for when it is opened, and not
-before; nothing downloads the whole of the website's decks. The strings come
+before; nothing downloads the whole of the website's decks.
+
+**And it does not ask for what it has.** The shelf is asked for at a launch,
+when a run ends, and when the app comes back to the front after more than
+five minutes away (`Store.wake()`). A deck the phone already holds is read
+from the phone while it agrees with its row on the shelf — as many cards,
+as many of them known — and each answer marks the card in the phone's copy,
+so a deck studied here still agrees afterwards. A lesson, a song or a
+conversation is read from the phone and takes whether it was read from its
+row. A copy older than seven days is asked for again, which is how long a
+word corrected in place on the website can take to reach a phone that holds
+it; a card added or removed changes the count and is asked for at once. The
+two gathered decks and a deck of your own are asked for every time.
+`Store.current()` is the rule. The strings come
 with the shelf and only the ones the app prints, two hundred of the site's
 twelve hundred — `?ui=` on the route, whose list of key prefixes is
 `Store.uiPrefixes` — and a deck comes with none. That made the shelf a third

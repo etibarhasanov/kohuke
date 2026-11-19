@@ -16,20 +16,14 @@ struct KohukeApp: App {
         WindowGroup {
             RootView()
                 .environment(store)
-                .task { await arrive() }
+                .task { await store.wake() }
         }
         .onChange(of: phase) { _, now in
             // Coming back to the app is when a deck added on the website,
-            // or a card answered there, should show up.
-            if now == .active { Task { await arrive() } }
+            // or a card answered there, should show up: `Store.wake()`,
+            // which does not ask twice in five minutes.
+            if now == .active { Task { await store.wake() } }
         }
-    }
-
-    /// Who this is and what is on the shelf, asked side by side.
-    private func arrive() async {
-        async let who: Void = store.whoAmI()
-        async let shelf: Void = store.refresh()
-        _ = await (who, shelf)
     }
 }
 

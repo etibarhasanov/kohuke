@@ -112,8 +112,31 @@ final class Store {
     /// until the prefix is added here.
     static let uiPrefixes = "flash,account,style,language,close,privacy"
 
+    /// When the shelf was last asked for, and how long that answer is good
+    /// for when all that has happened is the app coming back to the front.
+    private var asked: Date?
+    private static let shelfKeeps: TimeInterval = 5 * 60
+
+    /// The app has come to the front: who this is and what is on the shelf,
+    /// asked side by side — unless the shelf was asked for in the last five
+    /// minutes, when a glance at a message and back is not a reason to ask
+    /// again. A launch calls this twice, once for the window and once for
+    /// becoming active, and the second finds the first already asking.
+    /// Pulling the shelf down, the end of a run and a change of language
+    /// ask whatever the clock says: they call `refresh()` themselves.
+    func wake() async {
+        if let asked, Date().timeIntervalSince(asked) < Self.shelfKeeps {
+            if !unsent.isEmpty { await send() }
+            return
+        }
+        async let who: Void = whoAmI()
+        async let shelf: Void = refresh()
+        _ = await (who, shelf)
+    }
+
     /// The shelf, fresh. On a train it is the last one the phone was given.
     func refresh() async {
+        asked = Date()
         do {
             let data = try await API.data("api/flashcard", ["lang": lang, "ui": Self.uiPrefixes])
             adopt(data, shelf: true)
@@ -123,17 +146,21 @@ final class Store {
             if !unsent.isEmpty { Task { await send() } }
         } catch {
             offline = true
+            // Nothing came, so the next time the app comes forward it asks.
+            asked = nil
         }
         loaded = true
     }
 
     /// One deck, lesson, song or conversation, whole, asked for when it is
-    /// opened and not before. It comes without strings (`ui=` and nothing
-    /// after it): the shelf brought them. A 404 is an answer too —
+    /// opened and not before — and not at all where the phone's own copy is
+    /// still right: `current()` below. It comes without strings (`ui=` and
+    /// nothing after it): the shelf brought them. A 404 is an answer too —
     /// `error: not-found` — and the screens say the site's sentence for it.
     /// Off the network it is the copy kept from the last time it was opened.
     func open(_ id: String) async -> Answer? {
         let file = "one-\(id)-\(lang).json"
+        if let kept = current(id, file) { return kept }
         do {
             let (data, status) = try await API.fetch("api/flashcard", ["lang": lang, "deck": id, "ui": ""])
             guard let answer = adopt(data, shelf: false) else { return nil }
@@ -143,6 +170,74 @@ final class Store {
         } catch {
             offline = true
             return Disk.read(file).flatMap { try? JSONDecoder().decode(Answer.self, from: $0) }
+        }
+    }
+
+    /// How long a kept deck, lesson, song or conversation is read without
+    /// asking. A card added or taken away shows in the shelf's count and is
+    /// asked for at once; this is how long a word corrected in place on the
+    /// website can take to reach a phone that already holds the deck.
+    private static let contentKeeps: TimeInterval = 7 * 86400
+
+    /// The phone's own copy of something, where it can be shown without
+    /// asking the site. The words rarely change and what somebody knows of
+    /// them changes with every card, so the copy is held to the shelf, which
+    /// is asked for often and says both:
+    ///
+    /// - a deck the site ships, when it has as many cards and as many of
+    ///   them known as its row on the shelf says. `answer()` marks each card
+    ///   in the kept copy as it is answered, so a deck studied on this phone
+    ///   still agrees with its row afterwards; one studied on the website
+    ///   does not, and is asked for;
+    /// - a lesson, a song or a conversation, with whether it has been read
+    ///   taken from its row, since that is the one thing in it that is
+    ///   somebody's.
+    ///
+    /// Never the two gathered decks, which are put together anew each time,
+    /// nor a deck somebody wrote, whose words can change on the website
+    /// without its count changing. And only against a shelf the site has
+    /// just given: off the network `open()` falls back to the copy anyway.
+    private func current(_ id: String, _ file: String) -> Answer? {
+        guard loaded, !offline,
+              let age = Disk.age(file), age < Self.contentKeeps,
+              let data = Disk.read(file),
+              var answer = try? JSONDecoder().decode(Answer.self, from: data) else { return nil }
+        if let deck = answer.deck {
+            guard deck.own != true, deck.review != true, deck.missed != true,
+                  let row = decks.first(where: { $0.id == id }), !row.gathered, row.own != true,
+                  deck.cards.count == row.cards,
+                  deck.cards.filter({ $0.known == true }).count == row.known else { return nil }
+            return answer
+        }
+        if answer.lesson != nil, let row = lessons.first(where: { $0.id == id }) {
+            answer.lesson?.read = row.read
+            return answer
+        }
+        if answer.song != nil, let row = songs.first(where: { $0.id == id }) {
+            answer.song?.heard = row.heard
+            return answer
+        }
+        if answer.talk != nil, let row = talks.first(where: { $0.id == id }) {
+            answer.talk?.read = row.read
+            return answer
+        }
+        return nil
+    }
+
+    /// Marks a card in the phone's copy of its deck the way the site will
+    /// once it has the answer: known and not due, or the other way round —
+    /// `stateOfRow()` in the route. Every card of the deck, and none known,
+    /// where no card is named, which is Forget what I know.
+    private func mark(deck: String, card: String?, knew: Bool) {
+        Disk.edit("one-\(deck)-\(lang).json") { answer in
+            guard var one = answer["deck"] as? [String: Any],
+                  var cards = one["cards"] as? [[String: Any]] else { return }
+            for at in cards.indices where card == nil || cards[at]["id"] as? String == card {
+                cards[at]["known"] = knew
+                cards[at]["due"] = !knew
+            }
+            one["cards"] = cards
+            answer["deck"] = one
         }
     }
 
@@ -236,6 +331,7 @@ final class Store {
             return
         }
         hold(deck: deck, card: card, knew: knew)
+        mark(deck: deck, card: card, knew: knew)
         Task { await send() }
     }
 
@@ -282,6 +378,7 @@ final class Store {
     func reset(_ deck: String) async throws {
         try await API.post("api/flashcard", ["action": "reset", "deck": deck])
         unsent.removeAll { $0.user == user && $0.deck == deck }
+        mark(deck: deck, card: nil, knew: false)
     }
 
     // MARK: Answers not yet sent
