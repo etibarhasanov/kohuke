@@ -116,6 +116,8 @@ cannot be updated in a day, and they are listed in the website repository's
 | `GET /api/flashcard?lang=&ui=<prefixes>` | the shelf: decks, lessons, songs, conversations, how many words are known, who is asking, and the strings the app prints (`ui`, only the keys starting with `Store.uiPrefixes`) |
 | `GET /api/flashcard?lang=&deck=<id>&ui=` | one deck with its cards, or one lesson, song or conversation, whole, and no strings |
 | `POST /api/flashcard` | `knew`, `again`, `reset`, `report`, and for a deck of your own `deck`, `rename`, `drop`, `card`, `editcard`, `uncard` |
+| `GET /data/decks/<id>.json` | one deck, lesson, song or conversation as the website keeps it: a file, which runs no Function and reads no database |
+| `GET /data/decks/index.json` | the name of every deck, asked for only when a song or a conversation names one that is not on the shelf |
 | `GET /api/say?take=&text=` | the Estonian voice, as a WAV |
 | `GET /api/account` | who the session is, and `appGoogle` / `appApple` |
 | `POST /api/account` | `login`, `create`, `ticket`, `logout`, `delete` |
@@ -138,7 +140,22 @@ row. A copy older than seven days is asked for again, which is how long a
 word corrected in place on the website can take to reach a phone that holds
 it; a card added or removed changes the count and is asked for at once. The
 two gathered decks and a deck of your own are asked for every time.
-`Store.current()` is the rule. The strings come
+`Store.current()` is the rule.
+
+**And the words come from the website's files, not its database.** The
+site keeps every deck, lesson, song and conversation as a file of its own
+under `data/decks/`, which its Functions read; a file costs the site
+nothing to hand over, and an unchanged one is a 304. So where the phone has
+to fetch one, it fetches the file and puts the answer together itself
+(`Store.fromFiles()`): a lesson, a song or a conversation always, with
+whether it was read taken from the shelf; a deck where the shelf says none
+of its cards are known, or all of them, or as many as the phone's last copy
+has. Only a deck somebody has answered cards in somewhere else — the
+website, another phone — still goes to `/api/flashcard`, because only the
+database knows which cards. Anything that goes wrong with a file falls back
+to the route. What the route does to a file on its way out is repeated in
+`fromFiles()`, and a change to `deckAnswer()`, `lessonAnswer()`,
+`songAnswer()` or `talkAnswer()` on the website is a change there too. The strings come
 with the shelf and only the ones the app prints, two hundred of the site's
 twelve hundred — `?ui=` on the route, whose list of key prefixes is
 `Store.uiPrefixes` — and a deck comes with none. That made the shelf a third
