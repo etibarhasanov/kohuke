@@ -11,7 +11,8 @@
   `Kohuke.xcodeproj/project.pbxproj` (Debug and Release both) is set to that
   number and committed on `develop`, `develop` is merged into `main`
   (`git merge --no-ff develop -m "Release <number>"`), and the merge is
-  tagged `v<number>`. The version number is the owner's to choose; a session
+  tagged `v<number>` — which packages it and sends it to TestFlight
+  (`docs/RELEASING.md`). The version number is the owner's to choose; a session
   does not pick one.
 - How to make the bundle in Xcode and send it to Apple: `docs/RELEASING.md`.
 - `main` and `develop` both started from `main`'s last commit on 2026-11-20.
