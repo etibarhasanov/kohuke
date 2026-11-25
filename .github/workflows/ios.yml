@@ -18,10 +18,16 @@ permissions:
 on:
   workflow_dispatch:
 
+# A second press on the same branch makes the first moot. Packages are made
+# by release.yml, only when asked, and never here.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build for iOS Simulator
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +88,13 @@ jobs:
           check "bundle id"         '"CFBundleIdentifier" => "ee.tallinntastebuds.kohuke"'
           check "encryption answer" '"ITSAppUsesNonExemptEncryption"'
           check "launch screen colour" '"UIColorName" => "LaunchPaper"'
+          check "category"          '"LSApplicationCategoryType" => "public.app-category.education"'
+          # App Store Connect refuses a build that uses a required-reason API
+          # without the manifest that says why (ITMS-91053).
+          app=$(dirname "$plist")
+          for f in PrivacyInfo.xcprivacy app-strings.json; do
+            if [ -e "$app/$f" ]; then echo "ok: $f is in the bundle"; else echo "::error::$f is missing from the bundle"; fail=1; fi
+          done
           exit $fail
 
       # Nobody can look at a simulator from a cloud session, so the app is
@@ -153,7 +166,7 @@ jobs:
       # One orphan commit, force-pushed over the last, so the branch never
       # grows; it carries the screens of whichever branch pushed last.
       - name: Publish the screens to the ci-screens branch
-        if: github.event_name == 'push' && startsWith(github.ref_name, 'claude/')
+        if: startsWith(github.ref_name, 'claude/')
         shell: bash
         run: |
           set -euo pipefail
