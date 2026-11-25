@@ -226,6 +226,13 @@ pictures are the run's `screens` artifact, and for a `claude/` branch they
 are also pushed, shrunk, to the `ci-screens` branch, which is how a session
 with no Mac sees what it built.
 
+### Packaging
+
+`.github/workflows/release.yml` makes the signed build Apple takes: pushing a
+`v` tag sends it to TestFlight, and Actions → package → Run workflow does
+the same from any branch, or leaves just the `.ipa`. `docs/RELEASING.md`
+says how, and what the App Store listing needs.
+
 ### The icon
 
 `docs/icon.html` is the icon, drawn. Photograph it at 1024 × 1024 with any
