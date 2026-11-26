@@ -178,7 +178,7 @@ struct WordsTab: View {
                     Text(store.t("flashKeepTitle", "Remember where you got to"))
                         .font(.headline)
                         .foregroundStyle(Theme.ink)
-                    Text(store.t("appKeepWhy", "An account remembers which cards you know, on every phone and on tallinntastebuds.ee, and lets you write decks of your own."))
+                    Text(store.t("appKeepWhy", "An account remembers which cards you know, on every device and on tallinntastebuds.ee, and lets you write decks of your own."))
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                     Button { signingIn = true } label: {

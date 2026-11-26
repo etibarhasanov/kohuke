@@ -80,7 +80,7 @@ struct SignInView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         if creating {
                             Text(store.t("accountUsernameHint", "3–24 letters or numbers."))
-                            Text(store.t("appNoReset", "There’s no reset — let your iPhone save the password."))
+                            Text(store.t("appNoReset", "There’s no reset — let your device save the password."))
                         }
                         if let problem {
                             Text(problem).foregroundStyle(Theme.accent).padding(.top, 2)
