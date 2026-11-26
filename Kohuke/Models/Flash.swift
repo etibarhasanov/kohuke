@@ -156,12 +156,44 @@ struct Lesson: Decodable, Identifiable, Hashable {
     var underCases: Bool { heading == "cases" }
 }
 
-/// One piece of a lesson. Exactly one of the four is there.
+/// One piece of a lesson. Exactly one of the four is there — or, in a lesson
+/// written after this build was made, a kind of piece it has never heard of.
+/// That one used to be read as nothing and the lesson arrived with a hole in
+/// it. Where what it holds is words keyed by language, as `say` and `head`
+/// hold them, they are kept in `other` and drawn as prose; a kind that holds
+/// anything else — an address, a table of its own — is still passed over,
+/// since there is nothing here to draw it with.
 struct Block: Decodable, Hashable {
     let say: Said?
     let head: Said?
     let table: Paradigm?
     let examples: [Said]?
+    let other: Said?
+
+    private struct Kind: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let box = try decoder.container(keyedBy: Kind.self)
+        func read<T: Decodable>(_ kind: String) throws -> T? {
+            try box.decodeIfPresent(T.self, forKey: Kind(stringValue: kind))
+        }
+        say = try read("say")
+        head = try read("head")
+        table = try read("table")
+        examples = try read("examples")
+        if say == nil, head == nil, table == nil, examples == nil {
+            other = box.allKeys.sorted { $0.stringValue < $1.stringValue }
+                .compactMap { try? box.decode(Said.self, forKey: $0) }
+                .first { $0.shipped && !$0.in("en").isEmpty }
+        } else {
+            other = nil
+        }
+    }
 }
 
 struct Paradigm: Decodable, Hashable {

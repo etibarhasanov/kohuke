@@ -163,6 +163,21 @@ of the size it was and a deck four KB instead of seventy. A screen that
 starts printing a key outside those prefixes shows its English until the
 prefix is added.
 
+**And it draws what the website has added since it was built.** A phone
+keeps a build for months, so what the site grows into has to show on a build
+that never heard of it. A deck, a lesson, a song or a conversation is a row
+in the answer and always did. A stage beyond the four is drawn after them
+(`WordsTab.stages()`): its decks where it has opened, and its heading with
+how far off it is where it has not, which the app knows from `gates`. The
+heading is the site's string under `flashLevel` and the level — `flashLevelFar`
+for a level `far` — so a new stage needs that key in the site's `data/ui.json`;
+without it the decks are listed under no heading, as the website's own page
+lists a deck in no stage it knows. `case` and `song` stay the two levels that
+are not stages. A kind of piece in a lesson that this build does not know is
+drawn as prose where it holds words keyed by language (`Block.other`), and
+passed over where it holds anything else. A new tab, or a new kind of thing to
+open, still needs a new build.
+
 **Sign in with Apple needs the website to know this app.** Apple signs its
 token for a bundle id, and the website refuses one made for an app it does
 not name. `functions/api/_apple.js` there lists the ids it accepts; this
@@ -238,3 +253,7 @@ says how, and what the App Store listing needs.
 `docs/icon.html` is the icon, drawn. Photograph it at 1024 × 1024 with any
 headless browser and save it over
 `Kohuke/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.
+
+## Licence
+
+Kohuke is open source under the MIT licence (`LICENSE`), © 2026 Etibar Adalat.

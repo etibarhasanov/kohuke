@@ -15,6 +15,9 @@ import SwiftUI
 /// gathered decks — what was missed and what is known — where there is
 /// anything in them. Below them, the decks somebody wrote themselves.
 ///
+/// A stage the website adds after this build was made is drawn too, after
+/// the four: `stages()` below.
+///
 /// A phone that has never answered a card is not shown any of this first.
 /// It is shown Tere, the first card of Hello and goodbye, which is the
 /// website's front door: a stranger handed a shelf of forty decks is being
@@ -29,6 +32,32 @@ struct WordsTab: View {
         ("more", "flashLevelMore", "Getting by"),
         ("deep", "flashLevelDeep", "Going deeper")
     ]
+
+    /// The two levels that are not stages: a case's deck stands under its
+    /// lesson, and a song's under the song.
+    fileprivate static let elsewhere: Set = ["case", "song"]
+
+    /// The stages to draw: the four above, then any the website has added
+    /// since this build was made. A phone keeps a build for months, and a
+    /// deck filed under a stage it had never heard of used to be on no tab
+    /// at all.
+    ///
+    /// A new stage whose decks are in the answer comes in the order they do.
+    /// One that is still shut sends no decks and is known only by its gate,
+    /// so those follow, the nearest first. Its name is the site's string
+    /// under the key the four are named by, `flashLevel` and the level, and
+    /// it has no English here: until the site sends one its decks are listed
+    /// under no heading, which is where the website's own page puts a deck in
+    /// no stage it knows, and a shut one is not drawn.
+    fileprivate static func stages(_ shipped: [DeckRow], gates: [String: Int]) -> [(String, String, String)] {
+        var known = Set(levels.map { $0.0 }).union(elsewhere)
+        let met = shipped.map { $0.level ?? "" }
+            + gates.sorted { ($0.value, $0.key) < ($1.value, $1.key) }.map { $0.key }
+        let added = met.filter { known.insert($0).inserted }.map { level -> (String, String, String) in
+            (level, "flashLevel" + level.prefix(1).uppercased() + String(level.dropFirst()), "")
+        }
+        return levels + added
+    }
 
     var body: some View {
         Shelf(tab: 0, title: "Kohuke") {
@@ -101,11 +130,12 @@ struct WordsTab: View {
                 Rows { ForEach(gathered) { DeckShelfRow(deck: $0) } }
             }
 
-            ForEach(WordsTab.levels, id: \.0) { level, key, english in
-                let these = shipped.filter { $0.level == level }
-                let gate = store.gate(level)
+            ForEach(WordsTab.stages(shipped, gates: store.gates), id: \.0) { level, key, english in
+                let these = shipped.filter { ($0.level ?? "") == level }
+                let name = store.t(key, english)
+                let gate = name.isEmpty ? 0 : store.gate(level)
                 if !these.isEmpty || gate > 0 {
-                    Heading(text: store.t(key, english))
+                    if !name.isEmpty { Heading(text: name) }
                     if gate > 0 {
                         VStack(alignment: .leading, spacing: 6) {
                             ProgressView(value: Double(min(store.words, gate)), total: Double(gate))
@@ -148,7 +178,7 @@ struct WordsTab: View {
                     Text(store.t("flashKeepTitle", "Remember where you got to"))
                         .font(.headline)
                         .foregroundStyle(Theme.ink)
-                    Text(store.t("appKeepWhy", "An account remembers which cards you know, on every phone and on tallinntastebuds.ee, and lets you write decks of your own."))
+                    Text(store.t("appKeepWhy", "An account remembers which cards you know, on every device and on tallinntastebuds.ee, and lets you write decks of your own."))
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                     Button { signingIn = true } label: {

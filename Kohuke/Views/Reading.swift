@@ -71,7 +71,7 @@ struct LessonView: View {
 
     @ViewBuilder
     private func piece(_ block: Block) -> some View {
-        if let say = block.say {
+        if let say = block.say ?? block.other {
             Text(prose(store.means(say))).foregroundStyle(Theme.ink)
         } else if let head = block.head {
             Heading(text: store.means(head))
