@@ -78,7 +78,7 @@ Anybody can read the lessons, songs and conversations without an account. Your f
 WORKS OFFLINE
 Anything you have opened once stays on the device, so a deck can be studied on a plane. Answers given offline are sent when you are back online.
 
-No ads and no tracking. Four colour styles. On iPhone and iPad.
+Kohuke is for learning Estonian on your own. No ads and no tracking. Four colour styles. On iPhone and iPad.
 ```
 
 ## The addresses
