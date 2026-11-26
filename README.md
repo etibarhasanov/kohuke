@@ -238,3 +238,7 @@ says how, and what the App Store listing needs.
 `docs/icon.html` is the icon, drawn. Photograph it at 1024 × 1024 with any
 headless browser and save it over
 `Kohuke/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.
+
+## Licence
+
+Kohuke is open source under the MIT licence (`LICENSE`), © 2026 Etibar Adalat.
