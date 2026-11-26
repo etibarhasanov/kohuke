@@ -15,9 +15,9 @@
     "ru": "Карточки на сайте"
   },
   "appKeepWhy": {
-    "en": "An account remembers which cards you know, on every phone and on tallinntastebuds.ee, and lets you write decks of your own.",
-    "az": "Hesab hansı kartları bildiyini hər telefonda və tallinntastebuds.ee saytında yadda saxlayır, öz dəstlərini yaratmağa da imkan verir.",
-    "ru": "Аккаунт помнит, какие карточки вы знаете, на любом телефоне и на tallinntastebuds.ee, и позволяет составлять свои колоды."
+    "en": "An account remembers which cards you know, on every device and on tallinntastebuds.ee, and lets you write decks of your own.",
+    "az": "Hesab hansı kartları bildiyini hər cihazda və tallinntastebuds.ee saytında yadda saxlayır, öz dəstlərini yaratmağa da imkan verir.",
+    "ru": "Аккаунт помнит, какие карточки вы знаете, на любом устройстве и на tallinntastebuds.ee, и позволяет составлять свои колоды."
   },
   "appTalkHow": {
     "en": "Read it in Estonian, a sentence at a time, with what each means under it. Tap any word for what it means, and the speaker to hear the sentence.",
@@ -30,9 +30,9 @@
     "ru": "Не удалось связаться с tallinntastebuds.ee."
   },
   "appOfflineNote": {
-    "en": "Offline. This is what the phone saw last.",
-    "az": "Şəbəkə yoxdur. Bu, telefonun sonuncu dəfə gördüyüdür.",
-    "ru": "Нет сети. Это то, что телефон видел в последний раз."
+    "en": "Offline. This is what the app saw last.",
+    "az": "Şəbəkə yoxdur. Bu, tətbiqin sonuncu dəfə gördüyüdür.",
+    "ru": "Нет сети. Это то, что приложение видело в последний раз."
   },
   "appApple": {
     "en": "Continue with Apple",
@@ -45,9 +45,9 @@
     "ru": "Вход через Apple не завершился. Попробуйте ещё раз."
   },
   "appNoReset": {
-    "en": "There’s no reset — let your iPhone save the password.",
-    "az": "Bərpa yoxdur — qoy iPhone parolu yadda saxlasın.",
-    "ru": "Сброса пароля нет — пусть iPhone сохранит его."
+    "en": "There’s no reset — let your device save the password.",
+    "az": "Bərpa yoxdur — qoy cihaz parolu yadda saxlasın.",
+    "ru": "Сброса пароля нет — пусть устройство сохранит его."
   },
   "appGoogleOnSite": {
     "en": "Made your account with Google? Set a password for it on tallinntastebuds.ee, under your account, and sign in here with that.",

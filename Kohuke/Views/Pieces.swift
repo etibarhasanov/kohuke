@@ -42,7 +42,7 @@ struct Shelf<Content: View>: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if store.offline {
-                        Text(store.t("appOfflineNote", "Offline. This is what the phone saw last."))
+                        Text(store.t("appOfflineNote", "Offline. This is what the app saw last."))
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                     }
