@@ -161,7 +161,8 @@ On the app's page in App Store Connect, under the version:
 - **Screenshots**: the largest iPhone and the largest iPad sizes. Take them
   in the simulator with ⌘S; App Store Connect states the pixel sizes beside
   the upload box. The `screens` artifact of the build workflow is a start.
-- **Description, keywords, subtitle, promotional text.**
+- **Description, keywords, subtitle, promotional text**: the words are in
+  `docs/LISTING.md`, each under Apple's limit.
 - **Support URL**: `https://tallinntastebuds.ee/flashcard`.
 - **Privacy policy URL**: `https://tallinntastebuds.ee/privacy` — required;
   the app opens the same page from Me → Privacy. Read it first: if it does
