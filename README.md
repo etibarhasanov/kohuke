@@ -238,3 +238,9 @@ says how, and what the App Store listing needs.
 `docs/icon.html` is the icon, drawn. Photograph it at 1024 × 1024 with any
 headless browser and save it over
 `Kohuke/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.
+
+## Licence
+
+Open source under the MIT licence (`LICENSE`), © 2026 Etibar Hasanov, who
+writes it. Kohuke is published on the App Store by Avida TECH OÜ under that
+licence. The name and the icon are the app's own and not part of the licence.
